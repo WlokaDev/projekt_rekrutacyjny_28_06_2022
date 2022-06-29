@@ -34,7 +34,7 @@ services:
     image: 'postgres:14'
     container_name: ${PROJECT_NAME}_pgsql
     ports:
-      - '${FORWARD_DB_PORT:-5432}:5432'
+      - "${PGSQL_PORT}:5432"
     environment:
       PGPASSWORD: '${PGSQL_ROOT_PASSWORD}'
       POSTGRES_DB: '${PGSQL_DATABASE}'
