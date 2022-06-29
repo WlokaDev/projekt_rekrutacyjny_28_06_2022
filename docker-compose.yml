@@ -1,0 +1,63 @@
+version: '3.3'
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: ${PROJECT_NAME}_nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./lotto_app:/usr/share/nginx/web:cached
+      - ./docker/nginx/site.conf:/etc/nginx/conf.d/default.template
+      - ./docker/nginx/custom.conf:/etc/nginx/conf.d/custom.conf:ro
+      - ./docker/logs:/var/log/
+    command: /bin/sh -c "envsubst '$$NGINX_HOST' < /etc/nginx/conf.d/default.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+    networks:
+      - lotto_app
+    links:
+      - php:php
+
+  php:
+    build : docker/php
+    container_name: ${PROJECT_NAME}_php
+    working_dir: /usr/share/nginx/web
+    volumes:
+      - ./lotto_app:/usr/share/nginx/web:cached
+      - ./docker/php/php.ini:/usr/local/etc/php/php.ini
+    user: root
+    restart: always
+    networks:
+      - lotto_app
+
+  pgsql:
+    image: 'postgres:14'
+    container_name: ${PROJECT_NAME}_pgsql
+    ports:
+      - '${FORWARD_DB_PORT:-5432}:5432'
+    environment:
+      PGPASSWORD: '${PGSQL_ROOT_PASSWORD}'
+      POSTGRES_DB: '${PGSQL_DATABASE}'
+      POSTGRES_USER: '${PGSQL_USER}'
+      POSTGRES_PASSWORD: '${PGSQL_PASSWORD}'
+    volumes:
+      - './docker/pgsql/database:/var/lib/postgresql/data'
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "${PGSQL_DATABASE}", "-U", "${PGSQL_USER}"]
+      retries: 3
+      timeout: 5s
+    networks:
+      - lotto_app
+
+  cronjob:
+    container_name: ${PROJECT_NAME}_cron
+    build: docker/cron
+    volumes:
+      - ./lotto_app:/usr/share/nginx/web:cached
+    restart: always
+    networks:
+      - lotto_app
+
+networks:
+  lotto_app:
+    driver: bridge
